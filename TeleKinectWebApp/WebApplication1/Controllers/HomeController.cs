@@ -1,13 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Web;
 using System.Web.Mvc;
+using System.Xml.Serialization;
 using UnityEngine;
 
 namespace WebApplication1.Controllers
 {
 
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
+    public sealed class NoCacheAttribute : ActionFilterAttribute
+    {
+        public override void OnResultExecuting(ResultExecutingContext filterContext)
+        {
+            filterContext.HttpContext.Response.Cache.SetExpires(DateTime.UtcNow.AddDays(-1));
+            filterContext.HttpContext.Response.Cache.SetValidUntilExpires(false);
+            filterContext.HttpContext.Response.Cache.SetRevalidation(HttpCacheRevalidation.AllCaches);
+            filterContext.HttpContext.Response.Cache.SetCacheability(HttpCacheability.NoCache);
+            filterContext.HttpContext.Response.Cache.SetNoStore();
+
+            base.OnResultExecuting(filterContext);
+        }
+    }
+
+    [NoCache]
     public class HomeController : Controller
     {
         
@@ -128,51 +146,32 @@ namespace WebApplication1.Controllers
         {
             KinectWrapper.NuiSkeletonFrame frame = new KinectWrapper.NuiSkeletonFrame();
             
-            // retrieves the GET parameters to build up the skeleton frame.
+            // retrieves the GET parameters for arguments.
             uint dwMillisecondsToWait = UInt32.Parse(Request.QueryString["dwMillisecondsToWait"]);
-            string[] skeletonDataStruct = Request.QueryString["skeletonFrameData"].Split(',');
 
-            //public struct NuiSkeletonFrame
-            //{
-            //    public Int64 liTimeStamp;
-            //    public uint dwFrameNumber;
-            //    public uint dwFlags;
-            //    public Vector4 vFloorClipPlane;
-            //    public Vector4 vNormalToGravity;
-            //    [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 6, ArraySubType = UnmanagedType.Struct)]
-            //    public NuiSkeletonData[] SkeletonData;
-            //}
-            int i = 0;
-            frame.liTimeStamp = Int64.Parse(skeletonDataStruct[i++]);
-            frame.dwFrameNumber = uint.Parse(skeletonDataStruct[i++]);
-            frame.dwFlags = uint.Parse(skeletonDataStruct[i++]);
-            frame.vFloorClipPlane = ParseVector4(skeletonDataStruct[i++], skeletonDataStruct[i++], skeletonDataStruct[i++], skeletonDataStruct[i++]);
-            frame.vNormalToGravity = ParseVector4(skeletonDataStruct[i++], skeletonDataStruct[i++], skeletonDataStruct[i++], skeletonDataStruct[i++]);
+            XmlSerializer x = new XmlSerializer(frame.GetType());
 
-            // parses each skeleton data
-            //     public struct NuiSkeletonData
-            //{
-            //    public NuiSkeletonTrackingState eTrackingState;
-            //    public uint dwTrackingID;
-            //    public uint dwEnrollmentIndex_NotUsed;
-            //    public uint dwUserIndex;
-            //    public Vector4 Position;
-            //    [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 20, ArraySubType = UnmanagedType.Struct)]
-            //    public Vector4[] SkeletonPositions;
-            //    [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 20, ArraySubType = UnmanagedType.Struct)]
-            //    public NuiSkeletonPositionTrackingState[] eSkeletonPositionTrackingState;
-            //    public uint dwQualityFlags;
-            //}
-            for (int j = 0; j < 6; ++j)
-            {
-                KinectWrapper.NuiSkeletonData data = new KinectWrapper.NuiSkeletonData();
-                data.eTrackingState = (KinectWrapper.NuiSkeletonTrackingState)int.Parse(skeletonDataStruct[i++]);
-                data.dwTrackingID = uint.Parse(skeletonDataStruct[i++]);
-            }
+            StringWriter s = new StringWriter();
+            
             
             int hr = KinectWrapper.NuiSkeletonGetNextFrame(dwMillisecondsToWait, ref frame);
 
-            Response.Write(hr.ToString() + "," + frame.ToString());
+            // TODO: don't immediately smooth here, allow the smoothing api to be called separately.
+            var smoothParameters = new KinectWrapper.NuiTransformSmoothParameters();
+            smoothParameters.fSmoothing = 0.5f;
+            smoothParameters.fCorrection = 0.5f;
+            smoothParameters.fPrediction = 0.5f;
+            smoothParameters.fJitterRadius = 0.05f;
+            smoothParameters.fMaxDeviationRadius = 0.04f;
+
+            hr = hr != 0 ? hr : KinectWrapper.NuiTransformSmooth(ref frame, ref smoothParameters);
+
+            if (hr == 0)
+            {
+                x.Serialize(s, frame);
+            }
+
+            Response.Write(hr.ToString() + "," + s.ToString());
         }
 
         Vector4 ParseVector4(string x, string y, string z, string w)
