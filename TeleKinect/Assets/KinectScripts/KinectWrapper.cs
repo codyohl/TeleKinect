@@ -13,6 +13,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using System.IO;
 using System.Text;
+using System.Xml.Serialization;
 
 // Wrapper class that holds the various structs and dll imports
 // needed to set up a model with the Kinect.
@@ -471,38 +472,17 @@ public class KinectWrapper
     public static int NuiSkeletonGetNextFrame(uint dwMillisecondsToWait, ref NuiSkeletonFrame pSkeletonFrame)
     {
         WWW req = QueryServer("?method=NuiSkeletonGetNextFrame" +
-            "&dwMillisecondsToWait=" + dwMillisecondsToWait.ToString() + //dwMillisecondsToWait
-            "&skeletonFrameData=" + pSkeletonFrame.liTimeStamp.ToString() + // liTimeStamp
-                "," + pSkeletonFrame.dwFrameNumber.ToString() +     // dwFrameNumber
-                "," + pSkeletonFrame.dwFlags.ToString() +           // dwFlags
-                "," + pSkeletonFrame.vFloorClipPlane.x.ToString() +   // vFloorClipPlane.x
-                "," + pSkeletonFrame.vFloorClipPlane.y.ToString() +   // vFloorClipPlane.y
-                "," + pSkeletonFrame.vFloorClipPlane.z.ToString() +   // vFloorClipPlane.z
-                "," + pSkeletonFrame.vFloorClipPlane.w.ToString() +   // vFloorClipPlane.w
-                "," + pSkeletonFrame.vNormalToGravity.x.ToString() +  // vNormalToGravity.x
-                "," + pSkeletonFrame.vNormalToGravity.y.ToString() +  // vNormalToGravity.y
-                "," + pSkeletonFrame.vNormalToGravity.z.ToString() +  // vNormalToGravity.z
-                "," + pSkeletonFrame.vNormalToGravity.w.ToString() +  // vNormalToGravity.w
-                "," + SkeletonDataToString(pSkeletonFrame.SkeletonData[0]) + // SkeletonData[0]
-                "," + SkeletonDataToString(pSkeletonFrame.SkeletonData[1]) + // SkeletonData[1]
-                "," + SkeletonDataToString(pSkeletonFrame.SkeletonData[2]) + // SkeletonData[2]
-                "," + SkeletonDataToString(pSkeletonFrame.SkeletonData[3]) + // SkeletonData[3]
-                "," + SkeletonDataToString(pSkeletonFrame.SkeletonData[4]) + // SkeletonData[4]
-                "," + SkeletonDataToString(pSkeletonFrame.SkeletonData[5])); // SkeletonData[5]
+            "&dwMillisecondsToWait=" + dwMillisecondsToWait.ToString());
 
-        //public struct NuiSkeletonFrame
-        //{
-        //    public Int64 liTimeStamp;
-        //    public uint dwFrameNumber;
-        //    public uint dwFlags;
-        //    public Vector4 vFloorClipPlane;
-        //    public Vector4 vNormalToGravity;
-        //    [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 6, ArraySubType = UnmanagedType.Struct)]
-        //    public NuiSkeletonData[] SkeletonData;
-        //}
+        int hr = int.Parse(req.text.Split(',')[0]);
+        string skeletonFrameString = req.text.Split(',')[1];
+        if (hr == 0)
+        {
+            XmlSerializer x = new XmlSerializer(pSkeletonFrame.GetType());
+            pSkeletonFrame = (NuiSkeletonFrame) x.Deserialize(new StringReader(skeletonFrameString));
+        }
 
-
-        return int.Parse(req.text.Split(',')[0]);
+        return hr;
     }
 
     static string SkeletonDataToString(NuiSkeletonData data)
@@ -572,10 +552,12 @@ public class KinectWrapper
     // [DllImportAttribute(@"Kinect10.dll", EntryPoint = "NuiTransformSmooth")]
     public static int NuiTransformSmooth(ref NuiSkeletonFrame pSkeletonFrame, ref NuiTransformSmoothParameters pSmoothingParams)
     {
-        WWW req = QueryServer("?method=NuiTransformSmooth");
+        //WWW req = QueryServer("?method=NuiTransformSmooth");
 
-        //TODO parse skeleton stufffffff.
-        throw new NotImplementedException();
+        //TODO make the transformsmooth actually do something. right now, it is automatically smoothed when calling get next skeleton frame.
+        //throw new NotImplementedException();
+       
+        return 0;
     }
 
     // [DllImport(@"Kinect10.dll", EntryPoint = "NuiSkeletonCalculateBoneOrientations")]
